@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bài 9: Vận dụng công thức chuyển động thẳng biến đổi đều</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <script>
+        window.MathJax = {
+            startup: { typeset: false },
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$']],
+                processEscapes: true
+            },
+            svg: { fontCache: 'global' }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .drag-item { cursor: grab; }
+        .drag-item:active { cursor: grabbing; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease, transform 0.3s ease; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; transform: translate(-50%, -10px); }
+
+        /* Hiệu ứng rung lắc khi tai nạn */
+        @keyframes crashShake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+        .animate-crash {
+            animation: crashShake 0.5s;
+            animation-iteration-count: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+    <div id="app" class="max-w-6xl mx-auto p-4 flex flex-col h-screen overflow-hidden relative">
+        
+        <transition name="fade">
+            <div v-if="toast.show" 
+                 class="absolute top-20 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-lg shadow-xl text-white font-bold text-center text-sm"
+                 :class="toast.isError ? 'bg-red-600' : 'bg-green-600'">
+                <span v-html="toast.message"></span>
+            </div>
+        </transition>
+
+        <header class="bg-slate-900 text-white p-4 rounded-t-lg shadow-md flex justify-between items-center flex-shrink-0">
+            <div>
+                <h1 class="text-xl font-bold uppercase tracking-tight">VẬT LÍ 10 - BÀI 9 (YÊU CẦU 23)</h1>
+                <p class="text-xs opacity-90">Vận dụng hệ thống công thức chuyển động thẳng biến đổi đều giải quyết bài toán thực tế</p>
+            </div>
+            <div class="hidden md:block font-semibold italic text-emerald-400 text-xs">
+                Giải tích liên hợp động học
+            </div>
+        </header>
+
+        <nav class="bg-white shadow-md flex overflow-x-auto no-scrollbar rounded-b-lg mb-4 flex-shrink-0">
+            <button v-for="(tab, index) in tabs" :key="index" 
+                @click="changeTab(index + 1)"
+                class="flex-1 py-3 px-4 font-semibold text-center border-b-4 transition-colors whitespace-nowrap text-sm"
+                :class="activeTab === index + 1 ? 'border-slate-800 text-slate-800 bg-slate-50' : 'border-transparent text-gray-600 hover:bg-gray-100'">
+                {{ tab }}
+            </button>
+        </nav>
+
+        <main class="flex-1 overflow-y-auto bg-white rounded-lg shadow-md p-6 no-scrollbar relative">
+            
+            <div v-show="activeTab === 1" class="h-full flex flex-col">
+                <div class="flex justify-between items-center mb-2 border-b pb-2">
+                    <h2 class="text-lg font-bold text-slate-800">🕹️ Hoạt động: Phản xạ đạp phanh - Né tránh chướng ngại vật khẩn cấp</h2>
+                    <button @click="resetTab1" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded shadow transition">
+                        🔄 Làm lại tình huống
+                    </button>
+                </div>
+                <p class="italic text-gray-600 text-xs mb-4">Tình huống: Một chiếc ô tô đang lao đi với tốc độ v0 = 72 km/h (20 m/s). Bất ngờ xuất hiện rào chắn rải cách phía trước 45m. Hãy kéo thẻ gia tốc hãm phanh âm thích hợp thả vào hộp điều khiển cơ học để cứu chiếc xe dừng lại an toàn!</p>
+                
+                <div class="p-4 bg-gray-50 rounded-lg min-h-[80px] flex flex-wrap justify-center gap-4 border-2 border-dashed border-gray-300 mb-6 flex-shrink-0"
+                     @dragover.prevent @drop="drop('source')">
+                    <div v-for="item in sourceCards" :key="item.id"
+                         draggable="true" @dragstart="dragStart(item, 'source')"
+                         class="drag-item bg-white border-2 border-slate-700 text-slate-900 font-bold px-4 py-2 rounded shadow-sm text-xs hover:bg-slate-100 transition">
+                        Gia tốc hãm a = {{ item.val }} m/s²
+                    </div>
+                    <div v-if="sourceCards.length === 0" class="text-gray-500 font-bold italic text-xs self-center">
+                        Nhấn nút "Làm lại tình huống" ở góc trên bên phải để trải nghiệm tiếp.
+                    </div>
+                </div>
+
+                <div class="flex-1 border rounded-lg bg-slate-950 flex flex-col justify-between p-6 relative shadow-inner overflow-hidden">
+                    <div class="flex justify-between items-start z-10">
+                        <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Đường chạy khẩn cấp thực nghiệm</span>
+                        
+                        <div class="w-56 p-3 border-2 border-dashed rounded text-center text-xs font-bold bg-slate-900 transition-colors duration-300"
+                             :class="!targetControl.item ? 'border-red-400 text-red-400 bg-red-950/20' : (isCrashed ? 'border-red-600 text-red-500 bg-red-900/50' : 'border-green-500 text-green-400 bg-green-900/50')"
+                             @dragover.prevent @drop="drop('control')">
+                            <span v-if="!targetControl.item">KÉO THẺ GIA TỐC THẢ VÀO ĐÂY</span>
+                            <div v-else class="font-mono">🎯 Lệnh phanh: a = {{ targetControl.item.val }} m/s²</div>
+                        </div>
+                    </div>
+
+                    <div class="w-full h-24 relative bg-slate-900 rounded border border-slate-800 flex items-center mb-6">
+                        <div class="absolute bottom-0 left-0 right-0 h-4 bg-slate-800 flex justify-between px-4 text-[9px] text-slate-500 font-mono font-bold">
+                            <span>0m (Vạch phanh)</span><span>25m</span><span>40m (Vạch dừng an toàn)</span><span class="text-red-500 font-black">45m (RÀO CHẮN X)</span>
+                        </div>
+                        
+                        <div class="absolute bottom-4 w-2 h-10 bg-red-600 border border-white shadow transition-all duration-300 origin-bottom"
+                             style="left: 90%;"
+                             :class="isCrashed ? 'rotate-45 translate-x-2 translate-y-2 opacity-50' : 'animate-pulse rounded'">
+                        </div>
+
+                        <div class="absolute transition-all duration-1000 ease-out z-10" 
+                             :style="{ left: gameCarLeftStyle }"
+                             :class="{ 'animate-crash': isCrashed }">
+                            
+                            <div v-if="isCrashed" class="absolute -top-8 -right-4 text-3xl z-20 drop-shadow-md">💥</div>
+
+                            <div class="w-12 h-6 rounded relative shadow-md transition-all duration-300"
+                                 :class="isCrashed ? 'bg-red-800 rotate-[-10deg] translate-y-1' : (isSafe ? 'bg-green-500' : 'bg-amber-500')">
+                                <div class="w-2 h-1 bg-sky-100 absolute top-0.5 right-1"></div>
+                                <div class="w-2.5 h-2.5 bg-black rounded-full absolute -bottom-1 left-1.5 border"></div>
+                                <div class="w-2.5 h-2.5 bg-black rounded-full absolute -bottom-1 right-1.5 border"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div v-show="activeTab === 2">
+                <h2 class="text-lg font-bold text-slate-800 mb-4 border-b pb-2">📚 Sơ đồ thuật toán bóc tách và giải quyết bài toán Động học phức hợp</h2>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                    <div class="space-y-4 text-xs leading-relaxed">
+                        <div class="bg-gray-50 border p-4 rounded-lg shadow-sm">
+                            <h3 class="font-bold text-slate-800 text-sm mb-2">1. Quy trình 4 bước giải toán Động học chuẩn mực</h3>
+                            <p class="mb-1"><strong>Bước 1:</strong> Chọn hệ quy chiếu thống nhất (Gốc tọa độ O, trục tọa độ Ox trùng quỹ đạo thẳng, mốc thời gian t = 0 và chiều dương chuyển động).</p>
+                            <p class="mb-1"><strong>Bước 2:</strong> Đồng bộ hóa đơn vị đo lường quy chuẩn quốc tế SI (Đặc biệt đổi từ $km/h \rightarrow m/s$ bằng cách lấy giá trị chia cho **3,6**).</p>
+                            <p class="mb-1"><strong>Bước 3:</strong> Ly trích dữ liệu biên dấu đại số ($a \cdot v > 0$ đối với nhanh dần đều, $a \cdot v < 0$ đối với chậm dần đều hãm phanh).</p>
+                            <p><strong>Bước 4:</strong> Rút gọn ẩn số bằng cách chọn lựa phương trình liên hợp tối ưu nhất.</p>
+                        </div>
+                        
+                        <div class="bg-blue-50 border-l-4 border-blue-700 p-4 rounded-lg text-blue-900">
+                            <h3 class="font-bold text-sm mb-1.5">2. Hệ thống cẩm nang công thức bổ trợ chốt chặn</h3>
+                            <p class="mb-1">• Bài toán hãm phanh dừng hẳn ($v_{\text{cuối}} = 0$): Thời gian dừng $t = \frac{-v_0}{a}$; Quãng đường hãm cực đại $d = \frac{-v_0^2}{2a}$ (với $a < 0$).</p>
+                            <p>• Bài toán hai phương tiện gặp nhau ngoài không gian: Thiết lập hai phương trình tọa độ vị trí toàn phần $x_1(t)$ và $x_2(t)$. Cho chúng bằng nhau giải tìm nghiệm thời gian giao nhau: $x_1(t) = x_2(t)$.</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg border p-4 flex flex-col items-center justify-center min-h-[250px] shadow-sm">
+                        <p class="text-xs font-bold text-gray-500 mb-2">SƠ ĐỒ PHÂN TÍCH VECTƠ TRẠNG THÁI HÃM PHANH AN TOÀN</p>
+                        <svg viewBox="0 0 300 160" class="w-full h-auto">
+                            <line x1="20" y1="120" x2="270" y2="120" stroke="#475569" stroke-width="2"/>
+                            <polygon points="265,116 275,120 265,124" fill="#475569"/>
+                            <text x="268" y="112" font-size="9" font-weight="bold" fill="#475569">x (Chiều dương)</text>
+
+                            <rect x="110" y="70" width="40" height="20" fill="#64748b" rx="3"/>
+                            <circle cx="120" cy="95" r="5" fill="#0f172a"/>
+                            <circle cx="140" cy="95" r="5" fill="#0f172a"/>
+
+                            <line x1="155" y1="80" x2="205" y2="80" stroke="#10b981" stroke-width="2.5"/>
+                            <polygon points="200,77 208,80 200,83" fill="#10b981"/>
+                            <text x="212" y="83" font-size="9" font-weight="bold" fill="#10b981">v_0 &gt; 0</text>
+
+                            <line x1="105" y1="80" x2="55" y2="80" stroke="#ef4444" stroke-width="2.5"/>
+                            <polygon points="60,77 52,80 60,83" fill="#ef4444"/>
+                            <text x="35" y="83" font-size="9" font-weight="bold" fill="#ef4444">a &lt; 0</text>
+
+                            <text x="80" y="30" font-size="9" font-style="italic" fill="#0f172a">Tích số đại số: a . v &lt; 0 (Chậm dần đều)</text>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div v-show="activeTab === 3" class="h-full flex flex-col">
+                <h2 class="text-xl font-bold text-slate-800 mb-2 border-b pb-2">🔬 Giả lập cơ học phẳng: Khảo sát hãm phanh và bứt tốc của xe ô tô</h2>
+                
+                <div class="bg-gray-50 p-4 rounded-lg mb-4 flex flex-col md:flex-row gap-4 border flex-shrink-0 items-center justify-between">
+                    <div class="flex-1 w-full space-y-3">
+                        <div>
+                            <label class="block font-bold text-xs mb-1 text-slate-700">1. Chọn chế độ thực nghiệm giả lập:</label>
+                            <select v-model="simMode" @change="initSimulationParams" class="w-full p-2 border border-gray-300 rounded text-xs font-semibold focus:ring-2 focus:ring-slate-500">
+                                <option value="braking">Kịch bản 1: Ô tô đang chạy tốc độ cao đạp phanh khẩn cấp</option>
+                                <option value="accelerating">Kịch bản 2: Siêu xe tăng tốc bứt phá từ trạng thái nghỉ</option>
+                            </select>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-600 block mb-1">
+                                    Vận tốc ban đầu v₀ (m/s): 
+                                    <span class="text-blue-600 font-bold">{{ paramV0 }} m/s</span>
+                                </label>
+                                <input type="range" v-model.number="paramV0" :min="simMode === 'braking' ? 15 : 0" :max="simMode === 'braking' ? 25 : 5" step="1" class="w-full accent-slate-800" :disabled="isSimRunning">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-600 block mb-1">
+                                    Gia tốc chuyển động a (m/s²): 
+                                    <span class="text-blue-600 font-bold">{{ paramA }} m/s²</span>
+                                </label>
+                                <input type="range" v-model.number="paramA" :min="simMode === 'braking' ? -6 : 2" :max="simMode === 'braking' ? -2 : 6" step="0.5" class="w-full accent-slate-800" :disabled="isSimRunning">
+                            </div>
+                        </div>
+                        <button @click="runMechanicalSimulation" :disabled="isSimRunning"
+                                class="w-full py-2 bg-slate-900 text-white font-bold rounded shadow text-xs hover:bg-slate-800 transition disabled:bg-gray-400">
+                            🎬 KÍCH HOẠT HÀNH TRÌNH TÍNH TOÁN REALTIME
+                        </button>
+                    </div>
+
+                    <div class="w-full md:w-5/12 bg-slate-900 text-white border p-3 rounded-lg flex flex-col text-xs font-mono gap-1.5 shadow-inner">
+                        <div class="text-center font-bold text-[9px] text-slate-400 tracking-wider border-b border-slate-700 pb-1">HỆ THỐNG ĐỒNG HỒ ĐO TELEMETRY CƠ HỌC</div>
+                        <div class="flex justify-between">
+                            <span>Thời gian ảo hành trình (t):</span>
+                            <span class="font-bold text-blue-400"><span>{{ currentSimTime.toFixed(2) }}</span> s</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Vận tốc tức thời (v):</span>
+                            <span class="font-bold text-green-400"><span>{{ currentSimV.toFixed(1) }}</span> m/s</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Quãng đường dịch chuyển (d):</span>
+                            <span class="font-bold text-amber-400"><span>{{ currentSimD.toFixed(1) }}</span> m</span>
+                        </div>
+                        <div class="text-[10px] text-center font-bold bg-slate-800 py-1 rounded mt-0.5"
+                             :class="simMode === 'braking' ? 'text-orange-400' : 'text-emerald-400'">
+                            Trạng thái: <span>{{ simStatusText }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-4 flex items-center justify-center relative overflow-hidden shadow-inner min-h-[220px]">
+                    <svg viewBox="0 0 400 160" class="w-full h-full max-h-[180px]">
+                        <line x1="30" y1="120" x2="370" y2="120" stroke="#475569" stroke-width="2"/>
+                        <g stroke="#475569" stroke-width="1">
+                            <line x1="30" y1="120" x2="30" y2="126"/><text x="30" y="138" font-size="8" fill="#94a3b8" text-anchor="middle">0m</text>
+                            <line x1="115" y1="120" x2="115" y2="126"/><text x="115" y="138" font-size="8" fill="#94a3b8" text-anchor="middle">25m</text>
+                            <line x1="200" y1="120" x2="200" y2="126"/><text x="200" y="138" font-size="8" fill="#94a3b8" text-anchor="middle">50m</text>
+                            <line x1="285" y1="120" x2="285" y2="126"/><text x="285" y="138" font-size="8" fill="#94a3b8" text-anchor="middle">75m</text>
+                            <line x1="370" y1="120" x2="370" y2="126"/><text x="370" y="138" font-size="8" fill="#94a3b8" text-anchor="middle">100m</text>
+                        </g>
+
+                        <g v-if="simMode === 'braking'">
+                            <rect x="200" y="80" width="4" height="40" fill="#ef4444"/>
+                            <text x="200" y="74" font-size="7" font-weight="bold" fill="#ef4444" text-anchor="middle">RÀO CẢN KHẨN CẤP (50m)</text>
+                        </g>
+
+                        <g :transform="`translate(${30 + (currentSimD / 100) * 340}, 0)`">
+                            <rect x="-15" y="95" width="30" height="15" :fill="simMode === 'braking' ? '#f59e0b' : '#38bdf8'" rx="2"/>
+                            <circle cx="-8" cy="112" r="3.5" fill="#fff"/>
+                            <circle cx="8" cy="112" r="3.5" fill="#fff"/>
+
+                            <g v-if="currentSimV > 0">
+                                <line x1="0" y1="85" :x2="currentSimV * 2.5" y2="85" stroke="#10b981" stroke-width="2.5" stroke-linecap="round"/>
+                                <polygon :points="`${currentSimV * 2.5 - 4},82 ${currentSimV * 2.5 + 3},85 ${currentSimV * 2.5 - 4},88`" fill="#10b981"/>
+                                <text :x="currentSimV * 2.5 + 6" y="88" font-size="9" font-weight="bold" fill="#10b981">v</text>
+                            </g>
+                            
+                            <g v-if="paramA !== 0">
+                                <line x1="0" y1="73" :x2="paramA * 8" y2="73" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"/>
+                                <polygon :points="paramA > 0 ? `${paramA * 8 - 4},70 ${paramA * 8 + 3},73 ${paramA * 8 - 4},76` : `${paramA * 8 + 4},70 ${paramA * 8 - 3},73 ${paramA * 8 + 4},76`" fill="#ef4444"/>
+                                <text :x="paramA > 0 ? paramA * 8 + 6 : paramA * 8 - 12" y="76" font-size="9" font-weight="bold" fill="#ef4444">a</text>
+                            </g>
+                        </g>
+                    </svg>
+                </div>
+            </div>
+
+            <div v-show="activeTab === 4">
+                <h2 class="text-xl font-bold text-slate-800 mb-4 border-b pb-2">📝 Trắc nghiệm đo lường khảo sát năng lực vận dụng liên hợp phương trình</h2>
+                <div class="space-y-6">
+                    <div v-for="(q, qIndex) in questions" :key="q.id" class="bg-gray-50 p-5 rounded-lg border border-gray-200 shadow-sm">
+                        <p class="font-bold text-gray-800 mb-3 text-xs">Câu {{ qIndex + 1 }}: <span v-html="q.text"></span></p>
+                        <div class="flex flex-col gap-2">
+                            <button v-for="(opt, oIndex) in q.options" :key="oIndex"
+                                @click="selectOption(q.id, oIndex)"
+                                class="text-left px-4 py-3 border rounded-md transition-all duration-200 text-xs hover:bg-slate-50"
+                                :class="getOptionClass(q, oIndex)">
+                                <span class="font-bold mr-2">{{ String.fromCharCode(65 + oIndex) }}.</span>
+                                <span v-html="opt.text"></span>
+                            </button>
+                        </div>
+                        <div v-if="q.selected !== null" 
+                             class="mt-3 p-4 rounded-md text-xs border font-medium leading-relaxed"
+                             :class="q.options[q.selected].isCorrect ? 'bg-green-100 border-green-400 text-green-800' : 'bg-red-100 border-red-400 text-red-900'">
+                            💡 <strong>Phân tích kĩ thuật giải:</strong> <span v-html="q.options[q.selected].feedback"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+        </main>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted, nextTick } = Vue;
+
+        createApp({
+            setup() {
+                const tabs = ['1. Tình huống phản xạ', '2. Lý thuyết cốt lõi', '3. Xưởng giả lập động', '4. Trắc nghiệm giải tích'];
+                const activeTab = ref(1);
+                
+                let animationFrameId = null;
+                // Khai báo timeout ID để chống lỗi xung đột khi người dùng reset game ở tab 1
+                let tab1Timeout1 = null;
+                let tab1Timeout2 = null;
+
+                const triggerMathJax = () => {
+                    nextTick(() => {
+                        try {
+                            if (window.MathJax && window.MathJax.typesetPromise) {
+                                if (window.MathJax.typesetClear) window.MathJax.typesetClear();
+                                window.MathJax.typesetPromise().catch(e => console.error(e));
+                            }
+                        } catch(e) {}
+                    });
+                };
+
+                const changeTab = (tabIndex) => {
+                    activeTab.value = tabIndex;
+                    if(animationFrameId) {
+                        cancelAnimationFrame(animationFrameId);
+                        isSimRunning.value = false;
+                    }
+                    triggerMathJax();
+                };
+
+                // --- TAB 1: TRÒ CHƠI PHẢN XẠ NÂNG CẤP XỬ LÝ SỰ KIỆN TRỄ ---
+                const toast = ref({ show: false, message: '', isError: false });
+
+                // gameCarLeft lưu vị trí ĐẦU XE theo % chiều dài đường chạy.
+                // Khi đầu xe ở 90% thì vừa chạm mép rào chắn tại mốc 45m.
+                const gameCarLeft = ref(0);
+                const TRACK_MAX_DISTANCE = 50;
+                const BARRIER_DISTANCE = 45;
+                const BARRIER_FRONT_PERCENT = (BARRIER_DISTANCE / TRACK_MAX_DISTANCE) * 100;
+                const CAR_WIDTH_PX = 48; // tương ứng w-12 trong Tailwind
+                const CAR_TRANSITION_MS = 1000;
+                const gameCarLeftStyle = computed(() => {
+                    const frontPercent = Math.max(0, Math.min(gameCarLeft.value, BARRIER_FRONT_PERCENT));
+                    if (frontPercent === 0) return '0%';
+                    return `calc(${frontPercent}% - ${CAR_WIDTH_PX}px)`;
+                });
+
+                const targetControl = ref({ item: null });
+                const isCrashed = ref(false);
+                const isSafe = ref(false);
+
+                const getInitialCards = () => [
+                    { id: 'c1', val: -2 },
+                    { id: 'c2', val: -4 },
+                    { id: 'c3', val: -5 },
+                    { id: 'c4', val: -6 }
+                ].sort(() => Math.random() - 0.5);
+
+                const sourceCards = ref(getInitialCards());
+                const draggedItem = ref(null);
+
+                const resetTab1 = () => {
+                    clearTimeout(tab1Timeout1);
+                    clearTimeout(tab1Timeout2);
+                    gameCarLeft.value = 0;
+                    targetControl.value.item = null;
+                    isCrashed.value = false;
+                    isSafe.value = false;
+                    sourceCards.value = getInitialCards();
+                    toast.value.show = false;
+                };
+
+                const dragStart = (item, source) => { draggedItem.value = { item, source }; };
+                
+                const drop = (targetId) => {
+                    if (!draggedItem.value) return;
+                    const { item, source } = draggedItem.value;
+                    if (targetId === source) return;
+
+                    if (targetId === 'control') {
+                        clearTimeout(tab1Timeout1);
+                        clearTimeout(tab1Timeout2);
+                        isCrashed.value = false;
+                        isSafe.value = false;
+                        toast.value.show = false;
+
+                        targetControl.value.item = item;
+                        sourceCards.value = sourceCards.value.filter(c => c.id !== item.id);
+                        
+                        // v0 = 20 m/s nên d_hãm = -v0^2/(2a) = 200/|a|.
+                        const brakingDistance = 200 / Math.abs(item.val);
+                        const willHitBarrier = brakingDistance >= BARRIER_DISTANCE;
+                        
+                        if (willHitBarrier) {
+                            // Với a = -2 hoặc -4: xe còn chưa dừng trước mốc 45m,
+                            // vì vậy chỉ đưa ĐẦU XE đến đúng mép rào; rào/xe chưa đổi trạng thái trong khi xe đang chạy.
+                            gameCarLeft.value = BARRIER_FRONT_PERCENT;
+                            
+                            // Sau khi transition kết thúc, đầu xe vừa húc vào rào thì rào mới đổ, xe mới móp và nổ.
+                            tab1Timeout1 = setTimeout(() => {
+                                isSafe.value = false;
+                                isCrashed.value = true;
+                                toast.value = { show: true, message: `💥 Va chạm! Với a = ${item.val} m/s², quãng đường hãm là ${brakingDistance.toFixed(1)}m ≥ 45m nên đầu xe vừa húc vào rào thì rào mới đổ, xe móp và nổ.`, isError: true };
+                                tab1Timeout2 = setTimeout(() => toast.value.show = false, 4500);
+                            }, CAR_TRANSITION_MS);
+                        } else {
+                            // Xe dừng trước rào: vị trí hiển thị lấy theo đầu xe tại đúng quãng đường hãm.
+                            gameCarLeft.value = (brakingDistance / TRACK_MAX_DISTANCE) * 100;
+                            
+                            tab1Timeout1 = setTimeout(() => {
+                                isCrashed.value = false;
+                                isSafe.value = true;
+                                toast.value = { show: true, message: `🎉 Tuyệt vời! Xe dừng lại an toàn tại mốc ${brakingDistance.toFixed(1)}m, trước rào chắn 45m.`, isError: false };
+                                tab1Timeout2 = setTimeout(() => toast.value.show = false, 3500);
+                            }, CAR_TRANSITION_MS);
+                        }
+                    }
+                    draggedItem.value = null;
+                };
+
+                // --- TAB 3: GIẢ LẬP ĐA CHẾ ĐỘ ---
+                const simMode = ref('braking');
+                const paramV0 = ref(20);
+                const paramA = ref(-4);
+                
+                const isSimRunning = ref(false);
+                const currentSimTime = ref(0);
+                const currentSimV = ref(20);
+                const currentSimD = ref(0);
+                const simStatusText = ref("Hệ thống nạp đạn sẵn sàng");
+
+                const initSimulationParams = () => {
+                    if (simMode.value === 'braking') {
+                        paramV0.value = 20; paramA.value = -4; currentSimV.value = 20;
+                    } else {
+                        paramV0.value = 0; paramA.value = 4; currentSimV.value = 0;
+                    }
+                    currentSimTime.value = 0; currentSimD.value = 0;
+                    simStatusText.value = "Hệ thống nạp đạn sẵn sàng";
+                };
+
+                const runMechanicalSimulation = () => {
+                    if (isSimRunning.value) return;
+                    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
+                    isSimRunning.value = true;
+                    currentSimTime.value = 0;
+                    currentSimD.value = 0;
+
+                    const v0 = paramV0.value;
+                    const a = paramA.value;
+                    const mode = simMode.value;
+
+                    let tMax = 5;
+                    if (mode === 'braking') tMax = -v0 / a;
+
+                    let startTimestamp = null;
+                    const realtimeDuration = tMax * 1000; 
+
+                    const step = (timestamp) => {
+                        if (!startTimestamp) startTimestamp = timestamp;
+                        const elapsed = timestamp - startTimestamp;
+                        const progress = Math.min(elapsed / realtimeDuration, 1);
+                        
+                        const tSim = progress * tMax;
+                        currentSimTime.value = tSim;
+
+                        if (mode === 'braking') {
+                            currentSimV.value = Math.max(v0 + a * tSim, 0);
+                            currentSimD.value = v0 * tSim + 0.5 * a * tSim * tSim;
+                            
+                            if (currentSimD.value >= 50) {
+                                currentSimD.value = 50; currentSimV.value = 0;
+                                simStatusText.value = "Đâm sập rào chắn 💥";
+                                isSimRunning.value = false; return;
+                            }
+                            simStatusText.value = currentSimV.value === 0 ? "Dừng phanh an toàn thành công ✅" : "Đang hãm phanh khẩn cấp...";
+                        } else {
+                            currentSimV.value = v0 + a * tSim;
+                            currentSimD.value = v0 * tSim + 0.5 * a * tSim * tSim;
+                            
+                            if (currentSimD.value >= 100) {
+                                currentSimD.value = 100;
+                                simStatusText.value = "Đạt tốc độ mục tiêu thành công 🏎️";
+                                isSimRunning.value = false; return;
+                            }
+                            simStatusText.value = "Đang tăng tốc bứt phá...";
+                        }
+
+                        if (progress < 1 && isSimRunning.value) {
+                            animationFrameId = requestAnimationFrame(step);
+                        } else {
+                            isSimRunning.value = false;
+                        }
+                    };
+                    animationFrameId = requestAnimationFrame(step);
+                };
+
+                // --- TAB 4: TRẮC NGHIỆM ---
+                const questions = ref([
+                    {
+                        id: 1,
+                        text: 'Một chiếc xe ô tô đang di chuyển trên đường quốc lộ với tốc độ ổn định $72~km/h$ thì tài xế bất ngờ phát hiện chướng ngại vật và hãm phanh khẩn cấp, xe chuyển động thẳng chậm dần đều với gia tốc có độ lớn $4~m/s^2$. Thời gian từ lúc đạp phanh đến khi xe dừng hẳn là:',
+                        options: [
+                            { text: '$18~giây$.', isCorrect: false, feedback: 'Bẫy đơn vị: Bạn chưa đổi tốc độ $72~km/h = 20~m/s$ mà lấy trực tiếp $72/4 = 18$ là sai bản chất quy chuẩn SI.' },
+                            { text: '$5~giây$.', isCorrect: true, feedback: 'Tuyệt vời: Đổi $72~km/h = 20~m/s$. Vì xe dừng hẳn nên $v=0$. Áp dụng công thức vận tốc: $v = v_0 + at \\Rightarrow 0 = 20 - 4t \\Rightarrow t = 5~s$.' },
+                            { text: '$2,5~giây$.', isCorrect: false, feedback: 'Lỗi tính toán hệ số biến đổi.' },
+                            { text: '$288~giây$.', isCorrect: false, feedback: 'Bẫy: Phép nhân sai lệch cấu trúc.' }
+                        ], selected: null
+                    },
+                    {
+                        id: 2,
+                        text: 'Đoàn tàu hỏa đang vào ga với vận tốc $v_0 = 20~m/s$ thì bắt đầu hãm phanh chuyển động chậm dần đều với gia tốc đại số $a = -2~m/s^2$. Quãng đường lớn nhất đoàn tàu có thể trượt thêm cho đến khi dừng bánh cố định là:',
+                        options: [
+                            { text: '$200~m$.', isCorrect: false, feedback: 'Bẫy: Bạn quên chưa chia đôi tích số mẫu số $2a$ của hệ thức tự do.' },
+                            { text: '$100~m$.', isCorrect: true, feedback: 'Chính xác: Áp dụng phương trình độc lập thời gian khi dừng hẳn ($v=0$): $v^2 - v_0^2 = 2ad \\Rightarrow 0^2 - 20^2 = 2 \\cdot (-2) \\cdot d \\Rightarrow d = 100~m$.' },
+                            { text: '$50~m$.', isCorrect: false, feedback: 'Lỗi tính toán phân chặng.' },
+                            { text: '$400~m$.', isCorrect: false, feedback: 'Bẫy: Mới chỉ tính tử số bình phương vận tốc.' }
+                        ], selected: null
+                    },
+                    {
+                        id: 3,
+                        text: 'Biện luận kĩ thuật an toàn giao thông: Nếu vận tốc ban đầu của một phương tiện tăng lên gấp đôi ($2v_0$) trong khi hệ số bám đường và lực phanh không đổi (gia tốc hãm phanh $a$ giữ nguyên), thì quãng đường hãm phanh an toàn cực đại của xe sẽ biến đổi thế nào?',
+                        options: [
+                            { text: 'Tăng lên gấp hai lần.', isCorrect: false, feedback: 'Bẫy ngộ nhận: Quãng đường hãm phanh tỉ lệ thuận với bình phương vận tốc ban đầu, không phải tỉ lệ thuận bậc nhất.' },
+                            { text: 'Tăng lên gấp bốn lần.', isCorrect: true, feedback: 'Tuyệt vời: Khai thác phương trình liên hợp tự do $d = \\frac{-v_0^2}{2a}$. Khi $v_0$ tăng lên 2 lần thì tử số $(2v_0)^2$ tăng lên gấp 4 lần, khiến quãng đường trượt phanh dài gấp 4 lần. Đây là lý do phải tuyệt đối giảm tốc độ khi trời mưa trơn trượt!' },
+                            { text: 'Giảm đi một nửa.', isCorrect: false, feedback: 'Sai bản chất quy luật hàm mũ.' },
+                            { text: 'Giữ nguyên không thay đổi.', isCorrect: false, feedback: 'Sai thực nghiệm động học.' }
+                        ], selected: null
+                    },
+                    {
+                        id: 4,
+                        text: 'Bài toán hai vật gặp nhau: Một xe máy (1) đang chuyển động thẳng đều với vận tốc không đổi $10~m/s$ đi qua mốc O. Ngay lúc đó, một ô tô (2) cũng xuất phát từ mốc O chạy đuổi theo cùng chiều với gia tốc nhanh dần đều $2~m/s^2$. Thời điểm ô tô bắt kịp xe máy là:',
+                        options: [
+                            { text: '$5~giây$.', isCorrect: false, feedback: 'Bẫy: Quên chưa nhân hệ số $0.5$ vào phương trình vị trí chuyển động biến đổi đều.' },
+                            { text: '$10~giây$.', isCorrect: true, feedback: 'Hoàn hảo: Thiết lập phương trình tọa độ vị trí: $x_1 = 10t$; $x_2 = 0.5 \\cdot 2 \\cdot t^2 = t^2$. Điều kiện gặp nhau: $x_1 = x_2 \\Rightarrow 10t = t^2 \\Rightarrow t = 10~s$ (loại nghiệm t=0s lúc xuất phát).' },
+                            { text: '$20~giây$.', isCorrect: false, feedback: 'Lỗi giải phương trình bậc hai.' },
+                            { text: '$15~giây$.', isCorrect: false, feedback: 'Sai lệch phép tính chênh lệch vận tốc.' }
+                        ], selected: null
+                    }
+                ]);
+
+                const selectOption = (qId, optIdx) => {
+                    const q = questions.value.find(q => q.id === qId);
+                    if (q.selected === null) { q.selected = optIdx; triggerMathJax(); }
+                };
+
+                const getOptionClass = (q, oIndex) => {
+                    if (q.selected === null) return 'bg-white border-gray-300 hover:bg-slate-50';
+                    if (q.selected === oIndex) return q.options[oIndex].isCorrect ? 'bg-slate-800 text-white border-slate-900' : 'bg-red-500 text-white border-red-600';
+                    if (q.options[oIndex].isCorrect) return 'bg-green-100 border-green-500 text-green-900 font-bold'; 
+                    return 'bg-gray-100 border-gray-200 opacity-60'; 
+                };
+
+                onMounted(() => { triggerMathJax(); });
+
+                return { 
+                    tabs, activeTab, changeTab, toast, 
+                    gameCarLeft, gameCarLeftStyle, targetControl, sourceCards, dragStart, drop, resetTab1, isCrashed, isSafe,
+                    simMode, paramV0, paramA, isSimRunning, currentSimTime, currentSimV, currentSimD, simStatusText, initSimulationParams, runMechanicalSimulation, 
+                    questions, selectOption, getOptionClass 
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
